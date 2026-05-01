@@ -1,11 +1,77 @@
+from web3 import Web3
+from app.config import ETH_RPC_URL
 from app.utils import call_etherscan_api
+
+
+# Minimal ERC-20 ABI (only what we need)
+ERC20_ABI = [
+    {
+        "constant": True,
+        "inputs": [],
+        "name": "name",
+        "outputs": [{"name": "", "type": "string"}],
+        "type": "function",
+    },
+    {
+        "constant": True,
+        "inputs": [],
+        "name": "symbol",
+        "outputs": [{"name": "", "type": "string"}],
+        "type": "function",
+    },
+    {
+        "constant": True,
+        "inputs": [],
+        "name": "decimals",
+        "outputs": [{"name": "", "type": "uint8"}],
+        "type": "function",
+    },
+    {
+        "constant": True,
+        "inputs": [],
+        "name": "totalSupply",
+        "outputs": [{"name": "", "type": "uint256"}],
+        "type": "function",
+    },
+]
 
 
 def inspect_token(token_address: str):
     """
-    Inspect a token contract and return basic token information.
+    Inspect a token contract and return token metadata + risk notes.
     """
 
+    # Connect to blockchain
+    web3 = Web3(Web3.HTTPProvider(ETH_RPC_URL))
+
+    if not web3.is_connected():
+        raise ValueError("Failed to connect to Ethereum RPC")
+
+    # Create contract instance
+    contract = web3.eth.contract(address=Web3.to_checksum_address(token_address), abi=ERC20_ABI)
+
+    # --- Fetch token data safely ---
+    try:
+        name = contract.functions.name().call()
+    except:
+        name = None
+
+    try:
+        symbol = contract.functions.symbol().call()
+    except:
+        symbol = None
+
+    try:
+        decimals = contract.functions.decimals().call()
+    except:
+        decimals = None
+
+    try:
+        total_supply = contract.functions.totalSupply().call()
+    except:
+        total_supply = None
+
+    # --- Etherscan: verification ---
     source_data = call_etherscan_api(
         module="contract",
         action="getsourcecode",
@@ -16,10 +82,10 @@ def inspect_token(token_address: str):
         raise ValueError(f"Etherscan error: {source_data['result']}")
 
     contract_info = source_data["result"][0]
-
     source_code = contract_info.get("SourceCode", "")
     is_verified = source_code != ""
 
+    # --- Risk notes ---
     risk_notes = []
 
     if not is_verified:
@@ -39,10 +105,10 @@ def inspect_token(token_address: str):
 
     return {
         "address": token_address,
-        "name": contract_info.get("ContractName"),
-        "symbol": None,
-        "decimals": None,
-        "total_supply": None,
+        "name": name,
+        "symbol": symbol,
+        "decimals": decimals,
+        "total_supply": total_supply,
         "verified_contract": is_verified,
         "risk_notes": risk_notes,
     }
