@@ -40,7 +40,8 @@ def inspect_token(token_address: str):
     """
     Inspect a token contract and return token metadata + risk notes.
     """
-
+    if not Web3.is_address(token_address):
+        raise ValueError("Invalid Ethereum token address")
     # Connect to blockchain
     web3 = Web3(Web3.HTTPProvider(ETH_RPC_URL))
 
