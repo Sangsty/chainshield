@@ -117,7 +117,7 @@ def inspect_token(token_address: str):
     if "mint" in source_code.lower() or "issue" in source_code.lower():
         risk_notes.append("Contract may allow token supply changes.")
         risk_score += 20
-        
+
     if proxy_status == "1":
         risk_notes.append("Contract is upgradeable through a proxy.")
         risk_score += 15
@@ -144,14 +144,23 @@ def inspect_token(token_address: str):
         normalized_total_supply = total_supply / (10 ** decimals)
 
     return {
-        "address": token_address,
-        "name": name,
-        "symbol": symbol,
-        "decimals": decimals,
-        "total_supply_raw": total_supply,
-        "total_supply": normalized_total_supply,
-        "verified_contract": is_verified,
-        "risk_score": risk_score,
-        "risk_level": risk_level,
-        "risk_notes": risk_notes,
+        "token": {
+            "address": token_address,
+            "name": name,
+            "symbol": symbol,
+            "decimals": decimals,
+            "total_supply_raw": total_supply,
+            "total_supply": normalized_total_supply,
+        },
+        "contract": {
+            "verified": is_verified,
+            "compiler_version": compiler_version,
+            "is_proxy": proxy_status == "1",
+            "implementation_address": implementation_address or None,
+        },
+        "risk": {
+            "score": risk_score,
+            "level": risk_level,
+            "notes": risk_notes,
+        },
     }
