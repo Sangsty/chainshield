@@ -3,7 +3,7 @@ from app.config import ETH_RPC_URL
 from app.utils import call_etherscan_api
 from app.analyzers.holder_analyzer import analyze_holders
 from app.analyzers.contract_analyzer import analyze_contract_risks
-
+from app.analyzers.risk_notes import generate_risk_notes
 
 # Minimal ERC-20 ABI (only what we need)
 ERC20_ABI = [
@@ -157,7 +157,11 @@ def inspect_token(token_address: str):
     elif holder_analysis["whale_risk"] == "Medium":
         risk_score += 15
 
-    risk_notes.extend(holder_analysis["notes"])
+    # --- Generate final human-readable risk notes ---
+    risk_notes = generate_risk_notes(
+        contract_risk=contract_risk,
+        holder_analysis=holder_analysis,
+    )
 
     # --- Decide final risk level ---
     if risk_score >= 70:
