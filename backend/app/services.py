@@ -40,8 +40,10 @@ def inspect_token(token_address: str):
     """
     Inspect a token contract and return token metadata + risk notes.
     """
+
     if not Web3.is_address(token_address):
         raise ValueError("Invalid Ethereum token address")
+
     # Connect to blockchain
     web3 = Web3(Web3.HTTPProvider(ETH_RPC_URL))
 
@@ -49,27 +51,30 @@ def inspect_token(token_address: str):
         raise ValueError("Failed to connect to Ethereum RPC")
 
     # Create contract instance
-    contract = web3.eth.contract(address=Web3.to_checksum_address(token_address), abi=ERC20_ABI)
+    contract = web3.eth.contract(
+        address=Web3.to_checksum_address(token_address),
+        abi=ERC20_ABI,
+    )
 
     # --- Fetch token data safely ---
     try:
         name = contract.functions.name().call()
-    except:
+    except Exception:
         name = None
 
     try:
         symbol = contract.functions.symbol().call()
-    except:
+    except Exception:
         symbol = None
 
     try:
         decimals = contract.functions.decimals().call()
-    except:
+    except Exception:
         decimals = None
 
     try:
         total_supply = contract.functions.totalSupply().call()
-    except:
+    except Exception:
         total_supply = None
 
     # --- Etherscan: verification ---
@@ -86,34 +91,52 @@ def inspect_token(token_address: str):
     source_code = contract_info.get("SourceCode", "")
     is_verified = source_code != ""
 
-    # --- Risk notes ---
+    # --- Risk notes + score ---
     risk_notes = []
+    risk_score = 0
 
     if not is_verified:
         risk_notes.append("Contract source code is not verified.")
+        risk_score += 25
 
     if "onlyOwner" in source_code:
         risk_notes.append("Contract contains owner-only functions.")
+        risk_score += 15
 
     if "pause" in source_code.lower():
         risk_notes.append("Contract may include pause/unpause functionality.")
+        risk_score += 10
 
     if "blacklist" in source_code.lower():
         risk_notes.append("Contract may include blacklist functionality.")
+        risk_score += 20
 
     if "mint" in source_code.lower() or "issue" in source_code.lower():
         risk_notes.append("Contract may allow token supply changes.")
+        risk_score += 20
+
+    if risk_score >= 70:
+        risk_level = "High"
+    elif risk_score >= 40:
+        risk_level = "Medium"
+    else:
+        risk_level = "Low"
+
+    # --- Normalize supply ---
     normalized_total_supply = None
 
     if total_supply is not None and decimals is not None:
         normalized_total_supply = total_supply / (10 ** decimals)
+
     return {
-    "address": token_address,
-    "name": name,
-    "symbol": symbol,
-    "decimals": decimals,
-    "total_supply_raw": total_supply,
-    "total_supply": normalized_total_supply,
-    "verified_contract": is_verified,
-    "risk_notes": risk_notes,
-}
+        "address": token_address,
+        "name": name,
+        "symbol": symbol,
+        "decimals": decimals,
+        "total_supply_raw": total_supply,
+        "total_supply": normalized_total_supply,
+        "verified_contract": is_verified,
+        "risk_score": risk_score,
+        "risk_level": risk_level,
+        "risk_notes": risk_notes,
+    }
