@@ -32,6 +32,8 @@ The current MVP inspects an Ethereum ERC-20 token contract and returns:
 cd backend
 python -m uvicorn app.main:app --reload
 
+
+
 ## Phase 2: Risk Signal Engine
 
 Phase 2 expands ChainShield from a basic ERC-20 token inspector into an on-chain risk analysis engine.
