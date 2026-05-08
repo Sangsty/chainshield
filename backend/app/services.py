@@ -103,13 +103,17 @@ def inspect_token(token_address: str):
 
     if "mint" in source_code.lower() or "issue" in source_code.lower():
         risk_notes.append("Contract may allow token supply changes.")
+    normalized_total_supply = None
 
+    if total_supply is not None and decimals is not None:
+        normalized_total_supply = total_supply / (10 ** decimals)
     return {
-        "address": token_address,
-        "name": name,
-        "symbol": symbol,
-        "decimals": decimals,
-        "total_supply": total_supply,
-        "verified_contract": is_verified,
-        "risk_notes": risk_notes,
-    }
+    "address": token_address,
+    "name": name,
+    "symbol": symbol,
+    "decimals": decimals,
+    "total_supply_raw": total_supply,
+    "total_supply": normalized_total_supply,
+    "verified_contract": is_verified,
+    "risk_notes": risk_notes,
+}
