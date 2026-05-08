@@ -88,6 +88,9 @@ def inspect_token(token_address: str):
         raise ValueError(f"Etherscan error: {source_data['result']}")
 
     contract_info = source_data["result"][0]
+    compiler_version = contract_info.get("CompilerVersion", "")
+    proxy_status = contract_info.get("Proxy", "0")
+    implementation_address = contract_info.get("Implementation", "")
     source_code = contract_info.get("SourceCode", "")
     is_verified = source_code != ""
 
@@ -114,6 +117,18 @@ def inspect_token(token_address: str):
     if "mint" in source_code.lower() or "issue" in source_code.lower():
         risk_notes.append("Contract may allow token supply changes.")
         risk_score += 20
+        
+    if proxy_status == "1":
+        risk_notes.append("Contract is upgradeable through a proxy.")
+        risk_score += 15
+
+    if implementation_address:
+        risk_notes.append("Implementation contract detected.")
+        risk_score += 10
+
+    if "0.4." in compiler_version or "0.5." in compiler_version:
+        risk_notes.append("Contract uses an older Solidity compiler version.")
+        risk_score += 10
 
     if risk_score >= 70:
         risk_level = "High"
