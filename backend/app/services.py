@@ -2,6 +2,7 @@ from web3 import Web3
 from app.config import ETH_RPC_URL
 from app.utils import call_etherscan_api
 from app.analyzers.holder_analyzer import analyze_holders
+from app.analyzers.contract_analyzer import analyze_contract_risks
 
 
 # Minimal ERC-20 ABI (only what we need)
@@ -45,7 +46,6 @@ def inspect_token(token_address: str):
     if not Web3.is_address(token_address):
         raise ValueError("Invalid Ethereum token address")
 
-    # Connect to Ethereum RPC
     web3 = Web3(Web3.HTTPProvider(ETH_RPC_URL))
 
     if not web3.is_connected():
@@ -53,7 +53,6 @@ def inspect_token(token_address: str):
 
     checksum_address = Web3.to_checksum_address(token_address)
 
-    # Create ERC-20 contract instance
     contract = web3.eth.contract(
         address=checksum_address,
         abi=ERC20_ABI,
@@ -141,41 +140,16 @@ def inspect_token(token_address: str):
                 "notes": ["Holder data unavailable or API access limited."]
             }
 
-    # --- Risk notes + score ---
-    risk_notes = []
-    risk_score = 0
+    # --- Contract risk analysis ---
+    contract_risk = analyze_contract_risks(
+        source_code=source_code,
+        compiler_version=compiler_version,
+        proxy_status=proxy_status,
+        implementation_address=implementation_address,
+    )
 
-    if not is_verified:
-        risk_notes.append("Contract source code is not verified.")
-        risk_score += 25
-
-    if "onlyOwner" in source_code:
-        risk_notes.append("Contract contains owner-only functions.")
-        risk_score += 15
-
-    if "pause" in source_code.lower():
-        risk_notes.append("Contract may include pause/unpause functionality.")
-        risk_score += 10
-
-    if "blacklist" in source_code.lower():
-        risk_notes.append("Contract may include blacklist functionality.")
-        risk_score += 20
-
-    if "mint" in source_code.lower() or "issue" in source_code.lower():
-        risk_notes.append("Contract may allow token supply changes.")
-        risk_score += 20
-
-    if proxy_status == "1":
-        risk_notes.append("Contract is upgradeable through a proxy.")
-        risk_score += 15
-
-    if implementation_address:
-        risk_notes.append("Implementation contract detected.")
-        risk_score += 10
-
-    if "0.4." in compiler_version or "0.5." in compiler_version:
-        risk_notes.append("Contract uses an older Solidity compiler version.")
-        risk_score += 10
+    risk_notes = contract_risk["notes"]
+    risk_score = contract_risk["score"]
 
     # --- Add holder risk into total score ---
     if holder_analysis["whale_risk"] == "High":
@@ -213,6 +187,7 @@ def inspect_token(token_address: str):
             "compiler_version": compiler_version,
             "is_proxy": proxy_status == "1",
             "implementation_address": implementation_address or None,
+            "dangerous_functions_found": contract_risk["dangerous_functions_found"],
         },
         "holder_analysis": holder_analysis,
         "risk": {
