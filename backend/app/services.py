@@ -44,6 +44,16 @@ ERC20_ABI = [
 ]
 
 
+# Event signature topics
+TRANSFER_EVENT_TOPIC = Web3.keccak(
+    text="Transfer(address,address,uint256)"
+).hex()
+
+OWNERSHIP_TRANSFERRED_TOPIC = Web3.keccak(
+    text="OwnershipTransferred(address,address)"
+).hex()
+
+
 # Uniswap V2 Ethereum mainnet factory
 UNISWAP_V2_FACTORY_ADDRESS = "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f"
 
@@ -102,21 +112,14 @@ def get_contract_logs(
 ):
     """
     Fetch blockchain event logs from Etherscan.
-
-    Parameters:
-    - token_address: ERC-20 contract address
-    - topic0: Event signature hash
-    - from_block: Starting block
-    - to_block: Ending block
-
-    Returns:
-    - Raw Etherscan log response
     """
 
     params = {
         "address": token_address,
         "fromBlock": from_block,
         "toBlock": to_block,
+        "page": 1,
+        "offset": 100,
     }
 
     if topic0:
@@ -129,6 +132,98 @@ def get_contract_logs(
     )
 
     return response
+
+
+def extract_address_from_topic(topic: str):
+    """
+    Convert indexed event topic into Ethereum address.
+    """
+
+    if not topic:
+        return None
+
+    return "0x" + topic[-40:]
+
+
+def decode_transfer_logs(raw_logs):
+    """
+    Decode raw Transfer event logs into simple dictionaries.
+
+    Output format expected by event_analyzer:
+    {
+        "from": "...",
+        "to": "...",
+        "value": ...
+    }
+    """
+
+    transfer_events = []
+
+    for log in raw_logs:
+        try:
+            topics = log.get("topics", [])
+
+            if len(topics) < 3:
+                continue
+
+            from_address = extract_address_from_topic(topics[1])
+            to_address = extract_address_from_topic(topics[2])
+
+            value_hex = log.get("data", "0x0")
+            value = int(value_hex, 16)
+
+            transfer_events.append(
+                {
+                    "from": from_address,
+                    "to": to_address,
+                    "value": value,
+                    "transaction_hash": log.get("transactionHash"),
+                    "block_number": log.get("blockNumber"),
+                }
+            )
+
+        except Exception:
+            continue
+
+    return transfer_events
+
+
+def decode_ownership_logs(raw_logs):
+    """
+    Decode raw OwnershipTransferred event logs.
+
+    Output format expected by event_analyzer:
+    {
+        "previous_owner": "...",
+        "new_owner": "..."
+    }
+    """
+
+    ownership_events = []
+
+    for log in raw_logs:
+        try:
+            topics = log.get("topics", [])
+
+            if len(topics) < 3:
+                continue
+
+            previous_owner = extract_address_from_topic(topics[1])
+            new_owner = extract_address_from_topic(topics[2])
+
+            ownership_events.append(
+                {
+                    "previous_owner": previous_owner,
+                    "new_owner": new_owner,
+                    "transaction_hash": log.get("transactionHash"),
+                    "block_number": log.get("blockNumber"),
+                }
+            )
+
+        except Exception:
+            continue
+
+    return ownership_events
 
 
 def inspect_token(token_address: str):
@@ -331,11 +426,43 @@ def inspect_token(token_address: str):
         ],
     }
 
-    # --- Event log analysis placeholder ---
-    # Real event fetching/parsing will be added after basic integration is stable.
+    # --- Real event log fetching and parsing ---
+    transfer_events = []
+    ownership_events = []
+
+    try:
+        transfer_logs_response = get_contract_logs(
+            token_address=token_address,
+            topic0=TRANSFER_EVENT_TOPIC,
+            from_block=0,
+            to_block="latest",
+        )
+
+        if transfer_logs_response.get("status") == "1":
+            raw_transfer_logs = transfer_logs_response.get("result", [])
+            transfer_events = decode_transfer_logs(raw_transfer_logs)
+
+    except Exception:
+        transfer_events = []
+
+    try:
+        ownership_logs_response = get_contract_logs(
+            token_address=token_address,
+            topic0=OWNERSHIP_TRANSFERRED_TOPIC,
+            from_block=0,
+            to_block="latest",
+        )
+
+        if ownership_logs_response.get("status") == "1":
+            raw_ownership_logs = ownership_logs_response.get("result", [])
+            ownership_events = decode_ownership_logs(raw_ownership_logs)
+
+    except Exception:
+        ownership_events = []
+
     event_analysis = analyze_event_logs(
-        transfer_events=[],
-        ownership_events=[],
+        transfer_events=transfer_events,
+        ownership_events=ownership_events,
     )
 
     # --- Honeypot signal analysis ---
