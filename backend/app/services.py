@@ -463,6 +463,8 @@ def inspect_token(token_address: str):
     event_analysis = analyze_event_logs(
         transfer_events=transfer_events,
         ownership_events=ownership_events,
+        decimals=decimals,
+        total_supply=total_supply,
     )
 
     # --- Honeypot signal analysis ---
