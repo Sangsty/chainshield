@@ -88,7 +88,37 @@ UNISWAP_V2_PAIR_ABI = [
         "type": "function",
     },
 ]
+def get_contract_logs(
+    token_address: str,
+    topic0: str = None,
+    from_block: int = 0,
+    to_block: str = "latest",
+):
+    """
+    Fetch blockchain event logs from Etherscan.
 
+    Parameters:
+    - token_address: ERC-20 contract address
+    - topic0: Event signature hash
+    - from_block: Starting block
+    - to_block: Ending block
+
+    Returns:
+    - Raw Etherscan log response
+    """
+
+    response = call_etherscan_api(
+        module="logs",
+        action="getLogs",
+        params={
+            "address": token_address,
+            "fromBlock": from_block,
+            "toBlock": to_block,
+            "topic0": topic0,
+        },
+    )
+
+    return response
 def inspect_token(token_address: str):
     """
     Inspect an ERC-20 token and return metadata, contract risk,
