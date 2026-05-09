@@ -89,7 +89,6 @@ UNISWAP_V2_PAIR_ABI = [
     },
 ]
 
-
 def inspect_token(token_address: str):
     """
     Inspect an ERC-20 token and return metadata, contract risk,
