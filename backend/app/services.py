@@ -1,10 +1,14 @@
 from web3 import Web3
+
 from app.config import ETH_RPC_URL
 from app.utils import call_etherscan_api
+
 from app.analyzers.holder_analyzer import analyze_holders
 from app.analyzers.contract_analyzer import analyze_contract_risks
-from app.analyzers.risk_notes import generate_risk_notes
 from app.analyzers.liquidity_analyzer import analyze_liquidity
+from app.analyzers.risk_engine import calculate_weighted_risk_score
+from app.analyzers.event_analyzer import analyze_event_logs
+from app.analyzers.honeypot_analyzer import analyze_honeypot_signals
 
 
 # Minimal ERC-20 ABI
@@ -88,6 +92,8 @@ UNISWAP_V2_PAIR_ABI = [
         "type": "function",
     },
 ]
+
+
 def get_contract_logs(
     token_address: str,
     topic0: str = None,
@@ -107,22 +113,29 @@ def get_contract_logs(
     - Raw Etherscan log response
     """
 
+    params = {
+        "address": token_address,
+        "fromBlock": from_block,
+        "toBlock": to_block,
+    }
+
+    if topic0:
+        params["topic0"] = topic0
+
     response = call_etherscan_api(
         module="logs",
         action="getLogs",
-        params={
-            "address": token_address,
-            "fromBlock": from_block,
-            "toBlock": to_block,
-            "topic0": topic0,
-        },
+        params=params,
     )
 
     return response
+
+
 def inspect_token(token_address: str):
     """
     Inspect an ERC-20 token and return metadata, contract risk,
-    holder analysis, liquidity analysis, and final risk notes.
+    holder analysis, liquidity analysis, event analysis,
+    honeypot analysis, and final weighted risk score.
     """
 
     if not Web3.is_address(token_address):
@@ -185,6 +198,7 @@ def inspect_token(token_address: str):
         "largest_wallet_percentage": 0,
         "whale_risk": "Unknown",
         "top_holders_checked": 0,
+        "suspicious_wallets": [],
         "notes": ["Holder data unavailable."],
     }
 
@@ -222,6 +236,7 @@ def inspect_token(token_address: str):
                 "largest_wallet_percentage": 0,
                 "whale_risk": "Unknown",
                 "top_holders_checked": 0,
+                "suspicious_wallets": [],
                 "notes": ["Holder data unavailable or API access limited."],
             }
 
@@ -231,6 +246,12 @@ def inspect_token(token_address: str):
         "pair_address": None,
         "reserve_token": 0,
         "reserve_weth": 0,
+        "lp_total_supply": 0,
+        "burned_liquidity_percentage": 0,
+        "locked_liquidity_percentage": 0,
+        "creator_liquidity_percentage": 0,
+        "creator_controls_liquidity": False,
+        "liquidity_lock_status": "Unknown",
         "liquidity_risk": "Unknown",
         "notes": ["Liquidity data unavailable."],
     }
@@ -282,6 +303,12 @@ def inspect_token(token_address: str):
             "pair_address": None,
             "reserve_token": 0,
             "reserve_weth": 0,
+            "lp_total_supply": 0,
+            "burned_liquidity_percentage": 0,
+            "locked_liquidity_percentage": 0,
+            "creator_liquidity_percentage": 0,
+            "creator_controls_liquidity": False,
+            "liquidity_lock_status": "Unknown",
             "liquidity_risk": "Unknown",
             "notes": ["Liquidity data unavailable or RPC call failed."],
         }
@@ -294,36 +321,36 @@ def inspect_token(token_address: str):
         implementation_address=implementation_address,
     )
 
-    risk_score = contract_risk["score"]
+    contract_analysis = {
+        "verified": is_verified,
+        "compiler_version": compiler_version,
+        "is_proxy": proxy_status == "1",
+        "implementation_address": implementation_address or None,
+        "dangerous_functions_found": contract_risk[
+            "dangerous_functions_found"
+        ],
+    }
 
-    # --- Add holder risk into total score ---
-    if holder_analysis["whale_risk"] == "High":
-        risk_score += 25
-    elif holder_analysis["whale_risk"] == "Medium":
-        risk_score += 15
-
-    # --- Add liquidity risk into total score ---
-    if liquidity_analysis["liquidity_risk"] == "High":
-        risk_score += 20
-    elif liquidity_analysis["liquidity_risk"] == "Medium":
-        risk_score += 10
-
-    # --- Generate final human-readable risk notes ---
-    risk_notes = generate_risk_notes(
-        contract_risk=contract_risk,
-        holder_analysis=holder_analysis,
+    # --- Event log analysis placeholder ---
+    # Real event fetching/parsing will be added after basic integration is stable.
+    event_analysis = analyze_event_logs(
+        transfer_events=[],
+        ownership_events=[],
     )
 
-    risk_notes.extend(liquidity_analysis["notes"])
-    risk_notes = list(dict.fromkeys(risk_notes))
+    # --- Honeypot signal analysis ---
+    honeypot_analysis = analyze_honeypot_signals(source_code)
 
-    # --- Decide final risk level ---
-    if risk_score >= 70:
-        risk_level = "High"
-    elif risk_score >= 40:
-        risk_level = "Medium"
-    else:
-        risk_level = "Low"
+    # --- Centralized Phase 3 weighted risk engine ---
+    final_risk = calculate_weighted_risk_score(
+        {
+            "contract": contract_analysis,
+            "holder_analysis": holder_analysis,
+            "liquidity_analysis": liquidity_analysis,
+            "event_analysis": event_analysis,
+            "honeypot_analysis": honeypot_analysis,
+        }
+    )
 
     # --- Normalize token supply ---
     normalized_total_supply = None
@@ -340,20 +367,10 @@ def inspect_token(token_address: str):
             "total_supply_raw": total_supply,
             "total_supply": normalized_total_supply,
         },
-        "contract": {
-            "verified": is_verified,
-            "compiler_version": compiler_version,
-            "is_proxy": proxy_status == "1",
-            "implementation_address": implementation_address or None,
-            "dangerous_functions_found": contract_risk[
-                "dangerous_functions_found"
-            ],
-        },
+        "contract": contract_analysis,
         "holder_analysis": holder_analysis,
         "liquidity_analysis": liquidity_analysis,
-        "risk": {
-            "score": risk_score,
-            "level": risk_level,
-            "notes": risk_notes,
-        },
+        "event_analysis": event_analysis,
+        "honeypot_analysis": honeypot_analysis,
+        "risk": final_risk,
     }
