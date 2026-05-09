@@ -11,7 +11,6 @@ from app.analyzers.event_analyzer import analyze_event_logs
 from app.analyzers.honeypot_analyzer import analyze_honeypot_signals
 
 
-# Minimal ERC-20 ABI
 ERC20_ABI = [
     {
         "constant": True,
@@ -44,20 +43,16 @@ ERC20_ABI = [
 ]
 
 
-# Event signature topics
-TRANSFER_EVENT_TOPIC = Web3.keccak(
-    text="Transfer(address,address,uint256)"
-).hex()
+TRANSFER_EVENT_TOPIC = (
+    "0x" + Web3.keccak(text="Transfer(address,address,uint256)").hex()
+)
 
-OWNERSHIP_TRANSFERRED_TOPIC = Web3.keccak(
-    text="OwnershipTransferred(address,address)"
-).hex()
+OWNERSHIP_TRANSFERRED_TOPIC = (
+    "0x" + Web3.keccak(text="OwnershipTransferred(address,address)").hex()
+)
 
 
-# Uniswap V2 Ethereum mainnet factory
 UNISWAP_V2_FACTORY_ADDRESS = "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f"
-
-# WETH Ethereum mainnet address
 WETH_ADDRESS = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
 
 
@@ -110,10 +105,6 @@ def get_contract_logs(
     from_block: int = 0,
     to_block: str = "latest",
 ):
-    """
-    Fetch blockchain event logs from Etherscan.
-    """
-
     params = {
         "address": token_address,
         "fromBlock": from_block,
@@ -125,20 +116,14 @@ def get_contract_logs(
     if topic0:
         params["topic0"] = topic0
 
-    response = call_etherscan_api(
+    return call_etherscan_api(
         module="logs",
         action="getLogs",
         params=params,
     )
 
-    return response
-
 
 def extract_address_from_topic(topic: str):
-    """
-    Convert indexed event topic into Ethereum address.
-    """
-
     if not topic:
         return None
 
@@ -146,17 +131,6 @@ def extract_address_from_topic(topic: str):
 
 
 def decode_transfer_logs(raw_logs):
-    """
-    Decode raw Transfer event logs into simple dictionaries.
-
-    Output format expected by event_analyzer:
-    {
-        "from": "...",
-        "to": "...",
-        "value": ...
-    }
-    """
-
     transfer_events = []
 
     for log in raw_logs:
@@ -168,9 +142,7 @@ def decode_transfer_logs(raw_logs):
 
             from_address = extract_address_from_topic(topics[1])
             to_address = extract_address_from_topic(topics[2])
-
-            value_hex = log.get("data", "0x0")
-            value = int(value_hex, 16)
+            value = int(log.get("data", "0x0"), 16)
 
             transfer_events.append(
                 {
@@ -189,16 +161,6 @@ def decode_transfer_logs(raw_logs):
 
 
 def decode_ownership_logs(raw_logs):
-    """
-    Decode raw OwnershipTransferred event logs.
-
-    Output format expected by event_analyzer:
-    {
-        "previous_owner": "...",
-        "new_owner": "..."
-    }
-    """
-
     ownership_events = []
 
     for log in raw_logs:
@@ -227,12 +189,6 @@ def decode_ownership_logs(raw_logs):
 
 
 def inspect_token(token_address: str):
-    """
-    Inspect an ERC-20 token and return metadata, contract risk,
-    holder analysis, liquidity analysis, event analysis,
-    honeypot analysis, and final weighted risk score.
-    """
-
     if not Web3.is_address(token_address):
         raise ValueError("Invalid Ethereum token address")
 
@@ -248,7 +204,6 @@ def inspect_token(token_address: str):
         abi=ERC20_ABI,
     )
 
-    # --- Fetch token metadata ---
     try:
         name = contract.functions.name().call()
     except Exception:
@@ -269,15 +224,14 @@ def inspect_token(token_address: str):
     except Exception:
         total_supply = None
 
-    # --- Fetch verified contract source from Etherscan ---
     source_data = call_etherscan_api(
         module="contract",
         action="getsourcecode",
         params={"address": token_address},
     )
 
-    if source_data["status"] != "1":
-        raise ValueError(f"Etherscan error: {source_data['result']}")
+    if source_data.get("status") != "1":
+        raise ValueError(f"Etherscan error: {source_data.get('result')}")
 
     contract_info = source_data["result"][0]
 
@@ -287,7 +241,6 @@ def inspect_token(token_address: str):
     source_code = contract_info.get("SourceCode", "")
     is_verified = source_code != ""
 
-    # --- Holder analysis fallback ---
     holder_analysis = {
         "top_10_percentage": 0,
         "largest_wallet_percentage": 0,
@@ -297,7 +250,6 @@ def inspect_token(token_address: str):
         "notes": ["Holder data unavailable."],
     }
 
-    # --- Fetch top holders from Etherscan ---
     if total_supply is not None:
         try:
             holders_data = call_etherscan_api(
@@ -335,7 +287,6 @@ def inspect_token(token_address: str):
                 "notes": ["Holder data unavailable or API access limited."],
             }
 
-    # --- Liquidity analysis fallback ---
     liquidity_analysis = {
         "liquidity_found": False,
         "pair_address": None,
@@ -351,7 +302,6 @@ def inspect_token(token_address: str):
         "notes": ["Liquidity data unavailable."],
     }
 
-    # --- Check Uniswap V2 TOKEN/WETH liquidity ---
     try:
         factory_contract = web3.eth.contract(
             address=Web3.to_checksum_address(UNISWAP_V2_FACTORY_ADDRESS),
@@ -373,7 +323,6 @@ def inspect_token(token_address: str):
             )
 
             reserves = pair_contract.functions.getReserves().call()
-
             reserve0 = reserves[0]
             reserve1 = reserves[1]
 
@@ -408,7 +357,6 @@ def inspect_token(token_address: str):
             "notes": ["Liquidity data unavailable or RPC call failed."],
         }
 
-    # --- Contract risk analysis ---
     contract_risk = analyze_contract_risks(
         source_code=source_code,
         compiler_version=compiler_version,
@@ -426,7 +374,6 @@ def inspect_token(token_address: str):
         ],
     }
 
-    # --- Real event log fetching and parsing ---
     transfer_events = []
     ownership_events = []
 
@@ -467,10 +414,8 @@ def inspect_token(token_address: str):
         total_supply=total_supply,
     )
 
-    # --- Honeypot signal analysis ---
     honeypot_analysis = analyze_honeypot_signals(source_code)
 
-    # --- Centralized Phase 3 weighted risk engine ---
     final_risk = calculate_weighted_risk_score(
         {
             "contract": contract_analysis,
@@ -481,7 +426,6 @@ def inspect_token(token_address: str):
         }
     )
 
-    # --- Normalize token supply ---
     normalized_total_supply = None
 
     if total_supply is not None and decimals is not None:
