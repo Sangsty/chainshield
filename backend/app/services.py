@@ -166,12 +166,39 @@ def decode_transfer_logs(raw_logs):
 
     return transfer_events
 
+
+def decode_ownership_logs(raw_logs):
+    ownership_events = []
+
+    for log in raw_logs:
+        try:
+            topics = log.get("topics", [])
+
+            if len(topics) < 3:
+                continue
+
+            previous_owner = extract_address_from_topic(topics[1])
+            new_owner = extract_address_from_topic(topics[2])
+
+            ownership_events.append(
+                {
+                    "previous_owner": previous_owner,
+                    "new_owner": new_owner,
+                    "transaction_hash": log.get("transactionHash"),
+                    "block_number": log.get("blockNumber"),
+                }
+            )
+
+        except Exception:
+            continue
+
+    return ownership_events
+
+
 def estimate_holders_from_transfer_events(transfer_events, limit=10):
     """
     Estimate token holders from Transfer events.
-
-    This is a fallback when Etherscan top holder API is unavailable.
-    It is not perfect, but helps detect burned liquidity and active LP holders.
+    Used as fallback when top-holder API is unavailable.
     """
 
     balances = {}
@@ -207,32 +234,6 @@ def estimate_holders_from_transfer_events(transfer_events, limit=10):
     )
 
     return holders[:limit]
-def decode_ownership_logs(raw_logs):
-    ownership_events = []
-
-    for log in raw_logs:
-        try:
-            topics = log.get("topics", [])
-
-            if len(topics) < 3:
-                continue
-
-            previous_owner = extract_address_from_topic(topics[1])
-            new_owner = extract_address_from_topic(topics[2])
-
-            ownership_events.append(
-                {
-                    "previous_owner": previous_owner,
-                    "new_owner": new_owner,
-                    "transaction_hash": log.get("transactionHash"),
-                    "block_number": log.get("blockNumber"),
-                }
-            )
-
-        except Exception:
-            continue
-
-    return ownership_events
 
 
 def fetch_top_token_holders(contract_address: str, limit: int = 10):
@@ -270,6 +271,38 @@ def fetch_top_token_holders(contract_address: str, limit: int = 10):
         return []
 
     return holders
+
+
+def get_contract_creator(contract_address: str):
+    """
+    Fetch contract creator/deployer wallet from Etherscan.
+    """
+
+    try:
+        creator_data = call_etherscan_api(
+            module="contract",
+            action="getcontractcreation",
+            params={
+                "contractaddresses": contract_address,
+            },
+        )
+
+        if creator_data.get("status") == "1":
+            result = creator_data.get("result", [])
+
+            if result:
+                return {
+                    "creator_address": result[0].get("contractCreator"),
+                    "creation_tx_hash": result[0].get("txHash"),
+                }
+
+    except Exception:
+        pass
+
+    return {
+        "creator_address": None,
+        "creation_tx_hash": None,
+    }
 
 
 def inspect_token(token_address: str):
@@ -324,6 +357,9 @@ def inspect_token(token_address: str):
     implementation_address = contract_info.get("Implementation", "")
     source_code = contract_info.get("SourceCode", "")
     is_verified = source_code != ""
+
+    creator_info = get_contract_creator(token_address)
+    creator_address = creator_info.get("creator_address")
 
     holder_analysis = {
         "top_10_percentage": 0,
@@ -438,6 +474,7 @@ def inspect_token(token_address: str):
             reserve_weth=reserve_weth,
             lp_total_supply=lp_total_supply,
             lp_holders=lp_holders,
+            creator_address=creator_address,
         )
 
     except Exception:
@@ -522,6 +559,7 @@ def inspect_token(token_address: str):
             "liquidity_analysis": liquidity_analysis,
             "event_analysis": event_analysis,
             "honeypot_analysis": honeypot_analysis,
+            "creator": creator_info,
         }
     )
 
@@ -540,6 +578,7 @@ def inspect_token(token_address: str):
             "total_supply": normalized_total_supply,
         },
         "contract": contract_analysis,
+        "creator": creator_info,
         "holder_analysis": holder_analysis,
         "liquidity_analysis": liquidity_analysis,
         "event_analysis": event_analysis,
