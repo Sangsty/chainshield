@@ -166,7 +166,47 @@ def decode_transfer_logs(raw_logs):
 
     return transfer_events
 
+def estimate_holders_from_transfer_events(transfer_events, limit=10):
+    """
+    Estimate token holders from Transfer events.
 
+    This is a fallback when Etherscan top holder API is unavailable.
+    It is not perfect, but helps detect burned liquidity and active LP holders.
+    """
+
+    balances = {}
+
+    for event in transfer_events:
+        from_address = event.get("from")
+        to_address = event.get("to")
+        value = int(event.get("value", 0) or 0)
+
+        if from_address:
+            from_address = from_address.lower()
+            balances[from_address] = balances.get(from_address, 0) - value
+
+        if to_address:
+            to_address = to_address.lower()
+            balances[to_address] = balances.get(to_address, 0) + value
+
+    holders = []
+
+    for address, balance in balances.items():
+        if balance > 0:
+            holders.append(
+                {
+                    "address": address,
+                    "balance": balance,
+                }
+            )
+
+    holders = sorted(
+        holders,
+        key=lambda holder: holder["balance"],
+        reverse=True,
+    )
+
+    return holders[:limit]
 def decode_ownership_logs(raw_logs):
     ownership_events = []
 
@@ -365,6 +405,32 @@ def inspect_token(token_address: str):
                 lp_total_supply = 0
 
             lp_holders = fetch_top_token_holders(pair_address, limit=10)
+
+            if not lp_holders:
+                try:
+                    lp_transfer_logs_response = get_contract_logs(
+                        token_address=pair_address,
+                        topic0=TRANSFER_EVENT_TOPIC,
+                        from_block=0,
+                        to_block="latest",
+                    )
+
+                    if lp_transfer_logs_response.get("status") == "1":
+                        raw_lp_transfer_logs = lp_transfer_logs_response.get(
+                            "result", []
+                        )
+
+                        lp_transfer_events = decode_transfer_logs(
+                            raw_lp_transfer_logs
+                        )
+
+                        lp_holders = estimate_holders_from_transfer_events(
+                            lp_transfer_events,
+                            limit=10,
+                        )
+
+                except Exception:
+                    lp_holders = []
 
         liquidity_analysis = analyze_liquidity(
             pair_address=pair_address,
