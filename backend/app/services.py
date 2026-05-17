@@ -96,6 +96,13 @@ UNISWAP_V2_PAIR_ABI = [
         "outputs": [{"name": "", "type": "address"}],
         "type": "function",
     },
+    {
+        "constant": True,
+        "inputs": [],
+        "name": "totalSupply",
+        "outputs": [{"name": "", "type": "uint256"}],
+        "type": "function",
+    },
 ]
 
 
@@ -188,6 +195,43 @@ def decode_ownership_logs(raw_logs):
     return ownership_events
 
 
+def fetch_top_token_holders(contract_address: str, limit: int = 10):
+    """
+    Fetch top token holders using Etherscan token holder API.
+    Used for both token holders and LP token holders.
+    """
+
+    holders = []
+
+    try:
+        holders_data = call_etherscan_api(
+            module="token",
+            action="topholders",
+            params={
+                "contractaddress": contract_address,
+                "offset": limit,
+            },
+        )
+
+        if holders_data.get("status") == "1":
+            raw_holders = holders_data.get("result", [])
+
+            for holder in raw_holders:
+                holders.append(
+                    {
+                        "address": holder.get("TokenHolderAddress")
+                        or holder.get("address"),
+                        "balance": holder.get("TokenHolderQuantity")
+                        or holder.get("balance", 0),
+                    }
+                )
+
+    except Exception:
+        return []
+
+    return holders
+
+
 def inspect_token(token_address: str):
     if not Web3.is_address(token_address):
         raise ValueError("Invalid Ethereum token address")
@@ -251,33 +295,11 @@ def inspect_token(token_address: str):
     }
 
     if total_supply is not None:
-        try:
-            holders_data = call_etherscan_api(
-                module="token",
-                action="topholders",
-                params={
-                    "contractaddress": token_address,
-                    "offset": 10,
-                },
-            )
+        holders = fetch_top_token_holders(token_address, limit=10)
 
-            if holders_data.get("status") == "1":
-                raw_holders = holders_data.get("result", [])
-                holders = []
-
-                for holder in raw_holders:
-                    holders.append(
-                        {
-                            "address": holder.get("TokenHolderAddress")
-                            or holder.get("address"),
-                            "balance": holder.get("TokenHolderQuantity")
-                            or holder.get("balance", 0),
-                        }
-                    )
-
-                holder_analysis = analyze_holders(holders, total_supply)
-
-        except Exception:
+        if holders:
+            holder_analysis = analyze_holders(holders, total_supply)
+        else:
             holder_analysis = {
                 "top_10_percentage": 0,
                 "largest_wallet_percentage": 0,
@@ -315,6 +337,8 @@ def inspect_token(token_address: str):
 
         reserve_token = 0
         reserve_weth = 0
+        lp_total_supply = 0
+        lp_holders = []
 
         if pair_address != "0x0000000000000000000000000000000000000000":
             pair_contract = web3.eth.contract(
@@ -335,10 +359,19 @@ def inspect_token(token_address: str):
                 reserve_token = reserve1
                 reserve_weth = reserve0 / (10 ** 18)
 
+            try:
+                lp_total_supply = pair_contract.functions.totalSupply().call()
+            except Exception:
+                lp_total_supply = 0
+
+            lp_holders = fetch_top_token_holders(pair_address, limit=10)
+
         liquidity_analysis = analyze_liquidity(
             pair_address=pair_address,
             reserve_token=reserve_token,
             reserve_weth=reserve_weth,
+            lp_total_supply=lp_total_supply,
+            lp_holders=lp_holders,
         )
 
     except Exception:
