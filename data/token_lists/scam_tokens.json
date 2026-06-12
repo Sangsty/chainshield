@@ -1,0 +1,22 @@
+[
+  {"address": "0x7a2Bc711E19ba6aff6cE8246C546E8c4B4944DFD", "name": "SQUID2",        "label": "scam"},
+  {"address": "0x6368e1E18d4C7a7f04b8E4F27386b194EE58bE7d", "name": "VOLT_SCAM",     "label": "scam"},
+  {"address": "0xBb2b8038a1640196FbE3e38816F3e67Cba72D940", "name": "UNISWAP_FAKE",  "label": "scam"},
+  {"address": "0x34BA3af693d6c776d73C7fa67e2B2e79be8ef4ED", "name": "SAFEMOON_ETH",  "label": "scam"},
+  {"address": "0x5B2e4a700dfBc560061e957edec8F6EeEB74a320", "name": "METAVERSE_RUG", "label": "scam"},
+  {"address": "0xaE33Bb515C5e3bB5B5e7C3e9A5BC0cBBF06F91C1", "name": "MOONSHOT_RUG",  "label": "scam"},
+  {"address": "0xb0dFd28d3CF7A5897C694904Ace292539242f858", "name": "LUNA_CLASSIC_F", "label": "scam"},
+  {"address": "0x35bD01FC9d6D5D81CA9E055Db88Dc49aa2c699A8", "name": "FWB_FAKE",       "label": "scam"},
+  {"address": "0xa1faa113cbE53436Df28FF0aEe54275c13B40975", "name": "ALPHA_FAKE",     "label": "scam"},
+  {"address": "0x6B3595068778DD592e39A122f4f5a5cF09C90fE2", "name": "SUSHI_FAKE",    "label": "scam"},
+  {"address": "0x29127fE04ffa4c32AcAC0fFe17280ABD74eAC313", "name": "INUBIS",        "label": "scam"},
+  {"address": "0x09a3EcAFa817268f77BE1283176B946C4ff2E608", "name": "MIR_FAKE",       "label": "scam"},
+  {"address": "0x4a220E6096B25EADb88358cb44068A3248254675", "name": "QNT_FAKE",       "label": "scam"},
+  {"address": "0xCC8Fa225D80b9c7D42F96e9570156c65D6cAAa25", "name": "SLP_FAKE",       "label": "scam"},
+  {"address": "0xEA26c4aC16D4a5A106820BC8AEE85fd0b7b2b664", "name": "QUACK_RUG",     "label": "scam"},
+  {"address": "0x491604c0FDF08347Dd1fa4Ee062a822A5DD06B5D", "name": "CTSI_FAKE",      "label": "scam"},
+  {"address": "0x7D1AfA7B718fb893dB30A3aBc0Cfc608AaCfeBB0", "name": "MATIC_FAKE",    "label": "scam"},
+  {"address": "0x4E15361FD6b4BB609Fa63C81A2be19d873717870", "name": "FTM_FAKE",       "label": "scam"},
+  {"address": "0xBBbbCA6A901c926F240b89EacB641d8Aec7AEafD", "name": "LRC_FAKE",       "label": "scam"},
+  {"address": "0x3845badAde8e6dFF049820680d1F14bD3903a5d0", "name": "SAND_FAKE",      "label": "scam"}
+]
