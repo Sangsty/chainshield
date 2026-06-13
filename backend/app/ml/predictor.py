@@ -24,6 +24,6 @@ def run_ml_prediction(inspect_response: dict) -> dict:
 
     except Exception as e:
         return {
-            "status" : "error",
-            "message": str(e)
+            "status"  : "error",
+            "message" : str(e)
         }
