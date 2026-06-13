@@ -17,6 +17,7 @@ import TokenOverview from "./TokenOverview";
 import DetailedAnalysis from "./DetailedAnalysis";
 import { checkBackendHealth, inspectToken } from "../services/api";
 import { normalizeReport } from "../utils/riskHelpers";
+import MLPredictionCard from "./MLPredictionCard";
 
 function Layout() {
   const [address, setAddress] = useState("");
@@ -140,7 +141,7 @@ function Layout() {
                   <div className="space-y-5">
                     <RiskSummary report={report} loading={loading} />
                     <RiskBreakdown breakdown={report.categoryBreakdown} />
-
+                    <MLPredictionCard mlPrediction={report.raw?.ml_prediction} />
                     <div className="grid gap-5 xl:grid-cols-[1fr_0.9fr]">
                       <RedFlags explanations={report.explanations} />
                       <TokenOverview report={report} />
