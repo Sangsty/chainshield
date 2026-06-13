@@ -1,16 +1,16 @@
 from app.ml.feature_builder import build_features
 from app.ml.explainer import predict_and_explain
+from app.ml.anomaly_detector import detect_anomaly
 
 def run_ml_prediction(inspect_response: dict) -> dict:
-    """
-    Full ML pipeline:
-    1. Extract features from inspect response
-    2. Run prediction + SHAP explanation
-    3. Return structured ML block
-    """
     try:
         features = build_features(inspect_response)
-        result   = predict_and_explain(features)
+
+        # Random Forest prediction + SHAP
+        result = predict_and_explain(features)
+
+        # Isolation Forest anomaly detection
+        anomaly = detect_anomaly(features)
 
         return {
             "status"           : "success",
@@ -19,7 +19,8 @@ def run_ml_prediction(inspect_response: dict) -> dict:
             "scam_probability" : result["scam_probability"],
             "safe_probability" : result["safe_probability"],
             "top_features"     : result["top_features"],
-            "model_used"       : "Random Forest (v1)"
+            "model_used"       : "Random Forest (v1)",
+            "anomaly_detection": anomaly
         }
 
     except Exception as e:
