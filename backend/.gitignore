@@ -1,5 +1,15 @@
+# Environment
 .env
+
+# Python cache
 __pycache__/
 *.pyc
+*.pyo
+
+# Virtual environment
 .venv/
 venv/
+
+# ML Model binaries (too large / regenerable)
+app/ml/models/*.pkl
+app/ml/models/*.json

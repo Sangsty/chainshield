@@ -2,3 +2,9 @@
 # Frontend dependencies and build output
 frontend/node_modules/
 frontend/dist/
+# Raw collected token data (regenerable)
+data/raw/
+
+# ML model binaries
+backend/app/ml/models/*.pkl
+backend/app/ml/models/*.json
